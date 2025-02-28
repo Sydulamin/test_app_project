@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from myapi.views import ProductView, BuyerView,RegisterView,LoginAPIView, UpdateBuyerProfileAPIView, DepositToMainBalance, TransferToCashupDeposit, TransferToCashupOwingDeposit, PurchaseProduct,ConfirmedProductsList,CashupOwingDepositByBuyerAPIView,CashupDepositByBuyerAPIView,ConfirmedBuyersForProducts,BuyerPurchasesAPIView , ConfirmedBuyerView,ProductDetail, CartedProductsList
+from myapi.views import ProductView, ItemView, BuyerView,RegisterView,LoginAPIView,BuyerDetail,BuyerTransactionCreateView, UpdateBuyerProfileAPIView, DepositToMainBalance, TransferToCashupDeposit, TransferToCashupOwingDeposit, PurchaseProduct,ConfirmedProductsList,CashupOwingDepositByBuyerAPIView,CashupDepositByBuyerAPIView,ConfirmedBuyersForProducts,BuyerPurchasesAPIView , ConfirmedBuyerView,ProductDetail, CartedProductsList
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView 
 from django.contrib.auth.models import User
 
@@ -12,6 +12,8 @@ from django.contrib.auth.models import User
 router = DefaultRouter()
 router.register(r'purchase', ProductView)
 router.register(r'buyers', BuyerView)
+router.register(r'items', ItemView)
+
 
 # Define the urlpatterns with the additional views included
 urlpatterns = [
@@ -33,7 +35,9 @@ urlpatterns = [
     path('transfer-to-cashup-deposit/<int:buyer_id>/', TransferToCashupDeposit.as_view(), name='transfer-to-cashup-deposit'),
     path('transfer-to-cashup-owing-deposit/<int:buyer_id>/', TransferToCashupOwingDeposit.as_view(), name='transfer-to-cashup-owing-deposit'),
     path('purchase/', PurchaseProduct.as_view(), name='purchase-product'),
-    path('cashup-owing-deposits/<int:buyer_id>/', CashupOwingDepositByBuyerAPIView.as_view(), name='cashup-owing-deposits-by-buyer'),
+    path('api/cashup-owing-deposit/<int:buyer_id>/', CashupOwingDepositByBuyerAPIView.as_view(), name='cashup-owing-deposits-by-buyer'),
+    path('api/buyer/<int:pk>/', BuyerDetail.as_view(), name='buyer-detail'),
+    path('buyer_transactions/', BuyerTransactionCreateView.as_view(), name='buyer_transaction_create')
      
     
 ]

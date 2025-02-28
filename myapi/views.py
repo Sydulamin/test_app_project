@@ -1,6 +1,6 @@
 from rest_framework import viewsets , generics , mixins
 from .models import Purchase, Buyer ,Item , CashupOwingDeposit ,CashupDeposit
-from .serializers import PurchaseSerializer, LoginSerializer,TransferSerializer,CashupDepositSerializer,DepositSerializer ,BuyerSerializer , CashupOwingDepositSerializer ,DepositSerializer
+from .serializers import PurchaseSerializer,ItemSerializer, LoginSerializer,BuyerTransactionSerializer,TransferSerializer,CashupDepositSerializer,DepositSerializer ,BuyerSerializer , CashupOwingDepositSerializer ,DepositSerializer
 from django.db.models import Prefetch
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from .serializers import UpdateBuyerProfileSerializer
 from django.shortcuts import get_object_or_404
+from django.db import transaction 
 
 
 
@@ -28,6 +29,12 @@ class BuyerView(viewsets.ModelViewSet):
     """
     queryset = Buyer.objects.all()
     serializer_class = BuyerSerializer
+class ItemView(viewsets.ModelViewSet):
+    """
+    This viewset automatically provides `list`, `retrieve`, `create`, `update`, and `destroy` actions.
+    """
+    queryset = Item.objects.all()
+    serializer_class = ItemSerializer
 
 
 class ConfirmedProductsList(generics.ListAPIView):
@@ -53,6 +60,20 @@ class ProductDetail(generics.RetrieveUpdateDestroyAPIView,mixins.RetrieveModelMi
 
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
+class BuyerDetail(generics.RetrieveUpdateDestroyAPIView,mixins.RetrieveModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.DestroyModelMixin,
+                    generics.GenericAPIView):
+    queryset = Buyer.objects.all()
+    serializer_class = BuyerSerializer
+    
+    def get(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
+    
 
 class ConfirmedBuyerView(generics.ListAPIView):
     """
@@ -87,7 +108,7 @@ class BuyerPurchasesAPIView(APIView):
     def get(self, request, *args, **kwargs):
         buyer_id = kwargs.get('buyer_id')
         buyer = Buyer.objects.get(id=buyer_id)
-        products = Purchase.objects.filter(buyer=buyer, confirmed=True)
+        products = Purchase.objects.filter(buyer=buyer, confirmed=True,paid=True)
         
         total_cost = 0
         product_list = []
@@ -125,66 +146,75 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+
+class BuyerTransactionCreateView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = BuyerTransactionSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+    
+
+
 class CashupOwingDepositByBuyerAPIView(generics.ListAPIView):
     serializer_class = CashupOwingDepositSerializer
 
     def get_queryset(self):
         buyer_id = self.kwargs['buyer_id']
-        logger.info(f"Fetching CashupOwingDeposit records for buyer_id: {buyer_id}")
+        return CashupOwingDeposit.objects.filter(buyer__id=buyer_id).prefetch_related(Prefetch('buyer', queryset=Buyer.objects.all()))
         
-        # Check if the buyer exists
-        buyer_exists = Buyer.objects.filter(id=buyer_id).exists()
-        logger.info(f"Buyer exists: {buyer_exists}")
-        
-        # Fetch CashupOwingDeposit records
-        queryset = CashupOwingDeposit.objects.filter(buyer__id=buyer_id)
-        logger.info(f"Number of records found: {queryset.count()}")
-        
-        return queryset
 class CashupDepositByBuyerAPIView(generics.ListAPIView):
     serializer_class = CashupDepositSerializer
 
     def get_queryset(self):
         buyer_id = self.kwargs['buyer_id']
-        return CashupOwingDeposit.objects.filter(buyer__id=buyer_id).prefetch_related(Prefetch('buyer', queryset=Buyer.objects.all()))
+        return CashupDeposit.objects.filter(buyer__id=buyer_id).prefetch_related(Prefetch('buyer', queryset=Buyer.objects.all()))
 
 
 
 
-from rest_framework.views import APIView
+from django.db import IntegrityError
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework import status
 from .serializers import RegisterSerializer
-
-
+from .models import Buyer, User
 class RegisterView(APIView):
-    """
-    View for user registration.
-    """
     def post(self, request, *args, **kwargs):
-        """
-        Handle user registration.
-        """
-        # Pass the request data to the serializer
         serializer = RegisterSerializer(data=request.data)
-        
-        # Validate the input data
+
         if serializer.is_valid():
-            # Save the user and buyer instances
-            user = serializer.save()
-            
-            # Return a success response
+            user = serializer.save()  # Create the user with serializer's `create` method
+
+            # Ensure buyer is created only if the user doesn't already have one
+            if not hasattr(user, 'buyer'):  # Check if buyer already exists
+                Buyer.objects.create(
+                    user=user,
+                    phone_number=request.data.get('phone_number'),
+                    gender=request.data.get('gender'),
+                    date_of_birth=request.data.get('date_of_birth'),
+                    name=f"{request.data.get('first_name')} {request.data.get('last_name')}"
+                )
+
             return Response({
-                'message': 'User registered successfully.',
+                'message': 'User and buyer created successfully.',
                 'username': user.username,
                 'first_name': user.first_name,
-                'last_name': user.last_name
+                'last_name': user.last_name,
+                'phone_number': user.buyer.phone_number,
+                'gender': user.buyer.gender,
+                'date_of_birth': str(user.buyer.date_of_birth),
             }, status=status.HTTP_201_CREATED)
         
-        # If the data is invalid, return an error response
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+# --break-system-packages
 class LoginAPIView(APIView):
     """
     API view for user login. Returns JWT tokens on successful authentication.
@@ -234,6 +264,27 @@ class UpdateBuyerProfileAPIView(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+from django.db.models import Sum
+from django.db import transaction
+from django.db.models import Sum
+
+
+from django.db import transaction
+from django.db.models import Sum
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
+from django.db.models import Sum
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Buyer, CashupOwingDeposit
+from .serializers import DepositSerializer
+
 class DepositToMainBalance(APIView):
     def post(self, request, buyer_id):
         buyer = get_object_or_404(Buyer, id=buyer_id)
@@ -241,11 +292,47 @@ class DepositToMainBalance(APIView):
 
         if serializer.is_valid():
             amount = serializer.validated_data['amount']
-            buyer.main_balance += amount
-            buyer.save()
-            return Response({"message": f"Deposited {amount} to main balance", "new_balance": buyer.main_balance}, status=status.HTTP_200_OK)
+            
+            # Calculate the total cashup_owing_main_balance for the buyer
+            total_cashup_owing_main_balance = CashupOwingDeposit.objects.filter(
+                buyer=buyer
+            ).aggregate(total_balance=Sum('cashup_owing_main_balance'))['total_balance']
+
+            # Handle case where no owing balance exists
+            if total_cashup_owing_main_balance is None:
+                total_cashup_owing_main_balance = 0
+
+            # Calculate the neat amount
+            neat_amount = amount - total_cashup_owing_main_balance
+
+            # Debugging prints to verify values
+            print(f"Original main balance: {buyer.main_balance}")
+            print(f"Deposit amount: {amount}")
+            print(f"Total cashup owing main balance: {total_cashup_owing_main_balance}")
+            print(f"Neat amount (amount - total owing): {neat_amount}")
+
+            with transaction.atomic():
+                # Update the buyer's main balance
+                buyer.main_balance += neat_amount
+                buyer.save()
+
+                # Set cashup_owing_main_balance to 0 for all relevant CashupOwingDeposit instances
+                CashupOwingDeposit.objects.filter(buyer=buyer).update(cashup_owing_main_balance=0)
+
+                # Print updated main balance for verification
+                print(f"New main balance: {buyer.main_balance}")
+
+            return Response(
+                {
+                    "message": f"Deposited {neat_amount} to main balance. Owing balance deducted.",
+                    "new_balance": buyer.main_balance,
+                    "cashup_owing_main_balance": total_cashup_owing_main_balance
+                },
+                status=status.HTTP_200_OK
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
 class TransferToCashupDeposit(APIView):
     def post(self, request, buyer_id):
         buyer = get_object_or_404(Buyer, id=buyer_id)
@@ -269,6 +356,12 @@ class TransferToCashupDeposit(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 from .models import CashupOwingDeposit
 
+from django.db import transaction
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
 class TransferToCashupOwingDeposit(APIView):
     def post(self, request, buyer_id):
         buyer = get_object_or_404(Buyer, id=buyer_id)
@@ -276,20 +369,31 @@ class TransferToCashupOwingDeposit(APIView):
 
         if serializer.is_valid():
             amount = serializer.validated_data['amount']
+            
+            with transaction.atomic():
+                # Retrieve all CashupOwingDeposit instances for the buyer
+                cashup_owing_deposits = CashupOwingDeposit.objects.filter(buyer=buyer)
 
-            if buyer.main_balance < amount:
-                return Response({"error": "Insufficient funds"}, status=status.HTTP_400_BAD_REQUEST)
+                total_cashup_owing_main_balance = 0
+                if cashup_owing_deposits.exists():
+                    # Update the cashup_owing_main_balance for existing instances
+                    for deposit in cashup_owing_deposits:
+                        deposit.cashup_owing_main_balance = deposit.cashup_owing_main_balance + amount
+                        deposit.save()
+                        total_cashup_owing_main_balance = deposit.cashup_owing_main_balance
+                else:
+                    # Create a new CashupOwingDeposit instance if none exist
+                    cashup_owing_deposit = CashupOwingDeposit.objects.create(
+                        cashup_owing_main_balance=amount,
+                        buyer=buyer,
+                    )
+                    total_cashup_owing_main_balance = cashup_owing_deposit.cashup_owing_main_balance
 
-            buyer.main_balance -= amount
-            buyer.save()
-
-            CashupOwingDeposit.objects.create(
-                cashup_owing_main_balance=amount,
-                buyer=buyer,
-            )
-
-            return Response({"message": f"Transferred {amount} to Cashup Owing Deposit", "new_balance": buyer.main_balance}, status=status.HTTP_200_OK)
+            return Response({"message": f"Transferred {amount} to Cashup Owing Deposit", "cashup_owing_main_balance": total_cashup_owing_main_balance}, status=status.HTTP_200_OK)
+        
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 from .serializers import PurchaseSerializer
 
