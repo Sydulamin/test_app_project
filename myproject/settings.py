@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'myapi',
+    'corsheaders',
     'drf_spectacular',
     'rest_framework_simplejwt',
 ]
@@ -63,6 +64,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'myproject.urls'
@@ -98,7 +101,7 @@ DATABASES = {
 
 # settings.py
 
-
+CORS_ALLOW_ALL_ORIGINS = True
 
 
 # Password validation
