@@ -16,25 +16,44 @@ class ValidationError(Exception):
 class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
-        fields = ['id', 'name', 'description', 'is_available', 'price','members_price','item_image']
+        fields = ['id', 'name', 'description', 'is_available', 'price','members_price','item_image','discount_rate',]
 
 # Buyer Serializer
 class BuyerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Buyer
-        fields = ['id', 'name', 'phone_number','main_balance','date_of_birth','gender', 'membership_status', 'main_balance','buyer_image']
+        fields = ['id', 'name', 'phone_number','main_balance','date_of_birth','gender', 'membership_status','address', 'main_balance','buyer_image']
 
 # Purchase Serializer
+from rest_framework import serializers
+from .models import Purchase, Buyer, Item
+
 class PurchaseSerializer(serializers.ModelSerializer):
     buyer = serializers.PrimaryKeyRelatedField(queryset=Buyer.objects.all())  # Allow buyer to be set via ID
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all())  # Allow item to be set via ID
-    members_price = serializers.SerializerMethodField()  # Calculate members price dynamically
 
     class Meta:
         model = Purchase
         fields = [
-            'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 'members_price', 'confirmed'
+            'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 'confirmed','discount_total_price'
         ]
+
+    def create(self, validated_data):
+        # Extract the buyer and total price from the validated data
+        buyer = validated_data['buyer']
+        total_price = validated_data['total_price']
+
+        # Check if the buyer has sufficient main_balance
+        if buyer.main_balance < total_price:
+            raise serializers.ValidationError("Insufficient main balance to complete the purchase.")
+
+        # Deduct the total price from the buyer's main_balance
+        buyer.main_balance -= total_price
+        buyer.save()
+
+        # Create the purchase
+        purchase = Purchase.objects.create(**validated_data)
+        return purchase
 
     def get_members_price(self, obj):
         """
@@ -106,6 +125,8 @@ class CashupOwingDepositSerializer(serializers.ModelSerializer):
             'withdraw',
             'product_profit',
             'compounding_withdraw',
+            'monthly_compounding_profit',
+            'daily_compounding_profit',
         ]
         read_only_fields = ['created_at'] 
 
@@ -127,6 +148,8 @@ class CashupDepositSerializer(serializers.ModelSerializer):
             'withdraw',
             'product_profit',
             'compounding_withdraw',
+            'monthly_compounding_profit',
+            'daily_compounding_profit',
         ]
         read_only_fields = ['created_at']  # Automatically set by the model
 

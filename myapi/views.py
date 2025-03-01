@@ -49,8 +49,8 @@ class ProductDetail(generics.RetrieveUpdateDestroyAPIView,mixins.RetrieveModelMi
                     mixins.UpdateModelMixin,
                     mixins.DestroyModelMixin,
                     generics.GenericAPIView):
-    queryset = Purchase.objects.all()
-    serializer_class = PurchaseSerializer
+    queryset = Item.objects.all()
+    serializer_class = ItemSerializer
     
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
@@ -83,22 +83,36 @@ class ConfirmedBuyerView(generics.ListAPIView):
     serializer_class = BuyerSerializer
 
 
+
 class ConfirmedBuyersForProducts(APIView):
     """
     This view provides a list of all products with their confirmed buyers.
     """
     def get(self, request):
-        products = Purchase.objects.filter(confirmed=True).prefetch_related(
-            Prefetch('buyer', queryset=Buyer.objects.all(), to_attr='confirmed_buyer')
-        )
+        # Fetch confirmed purchases and prefetch related buyers
+        purchases = Purchase.objects.filter(confirmed=True).select_related('buyer')
+
         data = []
-        for product in products:
-            buyer_serializer = BuyerSerializer(product.confirmed_buyer) if product.confirmed_buyer else None
-            product_serializer = PurchaseSerializer(product)
+        for purchase in purchases:
+            # Serialize the product (purchase)
+            product_serializer = PurchaseSerializer(purchase)
+
+            # Serialize the buyer (if exists) and exclude unwanted fields
+            buyer_data = None
+            if purchase.buyer:
+                buyer_serializer = BuyerSerializer(purchase.buyer)
+                buyer_data = buyer_serializer.data
+
+                # Remove unwanted fields from the buyer data
+                unwanted_fields = ['date_of_birth', 'gender']
+                for field in unwanted_fields:
+                    buyer_data.pop(field, None)  # Remove the field if it exists
+
             data.append({
                 'product': product_serializer.data,
-                'confirmed_buyer': buyer_serializer.data if buyer_serializer else None
+                'confirmed_buyer': buyer_data
             })
+
         return Response(data)
 
 class BuyerPurchasesAPIView(APIView):

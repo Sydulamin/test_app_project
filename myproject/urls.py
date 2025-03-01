@@ -6,6 +6,9 @@ from myapi.views import ProductView, ItemView, BuyerView,RegisterView,LoginAPIVi
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView 
 from django.contrib.auth.models import User
 
+admin.site.site_header= 'CashUp'
+admin.site.index_title='Welcome to Cashup'
+
 
 
 # Create a default router and register your viewsets
