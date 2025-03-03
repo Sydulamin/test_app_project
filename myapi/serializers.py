@@ -1,6 +1,6 @@
 import re  # Import the re module for regular expressions
 from rest_framework import serializers
-from .models import Purchase, Buyer, CashupOwingDeposit, Item, CashupDeposit
+from .models import Purchase, Buyer, CashupOwingDeposit, Item, CashupDeposit ,BuyerTransaction
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -16,25 +16,44 @@ class ValidationError(Exception):
 class ItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
-        fields = ['id', 'name', 'description', 'is_available', 'price']
+        fields = ['id', 'name', 'description', 'is_available', 'price','members_price','item_image','discount_rate',]
 
 # Buyer Serializer
 class BuyerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Buyer
-        fields = ['id', 'name', 'phone_number','main_balance','date_of_birth','gender', 'membership_status', 'main_balance']
+        fields = ['id', 'name', 'phone_number','main_balance','date_of_birth','gender', 'membership_status','address', 'main_balance','buyer_image']
 
 # Purchase Serializer
+from rest_framework import serializers
+from .models import Purchase, Buyer, Item
+
 class PurchaseSerializer(serializers.ModelSerializer):
     buyer = serializers.PrimaryKeyRelatedField(queryset=Buyer.objects.all())  # Allow buyer to be set via ID
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all())  # Allow item to be set via ID
-    members_price = serializers.SerializerMethodField()  # Calculate members price dynamically
 
     class Meta:
         model = Purchase
         fields = [
-            'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 'members_price', 'confirmed'
+            'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 'confirmed','discount_total_price'
         ]
+
+    def create(self, validated_data):
+        # Extract the buyer and total price from the validated data
+        buyer = validated_data['buyer']
+        total_price = validated_data['total_price']
+
+        # Check if the buyer has sufficient main_balance
+        if buyer.main_balance < total_price:
+            raise serializers.ValidationError("Insufficient main balance to complete the purchase.")
+
+        # Deduct the total price from the buyer's main_balance
+        buyer.main_balance -= total_price
+        buyer.save()
+
+        # Create the purchase
+        purchase = Purchase.objects.create(**validated_data)
+        return purchase
 
     def get_members_price(self, obj):
         """
@@ -88,21 +107,50 @@ class PurchaseSerializer(serializers.ModelSerializer):
         return purchase
 
 # CashupOwingDeposit Serializer
+
+
 class CashupOwingDepositSerializer(serializers.ModelSerializer):
     buyer = BuyerSerializer(read_only=True)  # Nested serializer for buyer (read-only)
 
     class Meta:
         model = CashupOwingDeposit
-        fields = ['id', 'cashup_owing_main_balance', 'buyer', 'created_at']
-        read_only_fields = ['created_at']  # Automatically set by the model
+        fields = [
+            'id',
+            'cashup_owing_main_balance',  # Updated field name (from cashup_owing_main_balance)
+            'buyer',
+            'created_at',
+            'daily_profit',
+            'compounding_profit',
+            'monthly_profit',
+            'withdraw',
+            'product_profit',
+            'compounding_withdraw',
+            'monthly_compounding_profit',
+            'daily_compounding_profit',
+        ]
+        read_only_fields = ['created_at'] 
 
+        
 # CashupDeposit Serializer
 class CashupDepositSerializer(serializers.ModelSerializer):
     buyer = BuyerSerializer(read_only=True)  # Nested serializer for buyer (read-only)
 
     class Meta:
         model = CashupDeposit
-        fields = ['id', 'cashup_owing_main_balance', 'buyer', 'created_at']
+        fields = [
+            'id',
+            'cashup_main_balance',  # Updated field name (from cashup_owing_main_balance)
+            'buyer',
+            'created_at',
+            'daily_profit',
+            'compounding_profit',
+            'monthly_profit',
+            'withdraw',
+            'product_profit',
+            'compounding_withdraw',
+            'monthly_compounding_profit',
+            'daily_compounding_profit',
+        ]
         read_only_fields = ['created_at']  # Automatically set by the model
 
 # Password Validation
@@ -114,7 +162,13 @@ def validate_password(value):
     if len(value) != 6:
         raise ValidationError('Password must be exactly 6 characters long.')
     return value
-# Register Serializer
+
+class BuyerTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BuyerTransaction
+        fields = ['method','amount','buyer', 'transaction_id', 'phone_number']
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
@@ -193,29 +247,20 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """
-        Create a new User and Buyer instance.
+        Create a new User.
         """
-        with transaction.atomic():
-            # Create the User
-            user = User.objects.create(
-                first_name=validated_data['first_name'],
-                last_name=validated_data['last_name'],
-                username=validated_data['phone_number']  # Use phone number as the username
-            )
-            user.set_password(validated_data['password'])
-            user.save()
-
-            # Create the Buyer
-            buyer = Buyer.objects.create(
-                user=user,
-                phone_number=validated_data['phone_number'],
-                name=f"{validated_data['first_name']} {validated_data['last_name']}",
-                gender=validated_data['gender'],
-                date_of_birth=validated_data['date_of_birth'],
-                membership_status=False
-            )
+        # Create the User (Buyer creation is deferred to the view)
+        user = User.objects.create(
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+            username=validated_data['phone_number']  # Use phone number as the username
+        )
+        user.set_password(validated_data['password'])
+        user.save()
 
         return user
+
+
 
 # Login Serializer
 class LoginSerializer(serializers.Serializer):
@@ -265,7 +310,7 @@ class LoginSerializer(serializers.Serializer):
 class UpdateBuyerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Buyer
-        fields = ['name', 'phone_number', 'membership_status']
+        fields = ['name', 'phone_number', 'membership_status','date_of_birth','address','buyer_image']
         extra_kwargs = {
             'phone_number': {'required': False},  # Make phone_number optional for updates
             'membership_status': {'required': False}  # Make membership_status optional
@@ -275,6 +320,14 @@ class UpdateBuyerProfileSerializer(serializers.ModelSerializer):
         if value and Buyer.objects.filter(phone_number=value).exclude(id=self.instance.id).exists():
             raise serializers.ValidationError("This phone number is already in use.")
         return value
+# serializers.py
+from rest_framework import serializers
+from .models import BuyerOTP
+
+class BuyerOTPSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BuyerOTP
+        fields = ['buyer', 'otp', 'created_at', 'is_verified']
 
 # Deposit Serializer
 class DepositSerializer(serializers.Serializer):

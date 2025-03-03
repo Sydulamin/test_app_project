@@ -1,3 +1,4 @@
+
 """
 Django settings for myproject project.
 
@@ -43,6 +44,7 @@ SIMPLE_JWT = {
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -56,6 +58,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -63,6 +66,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
@@ -99,7 +103,15 @@ DATABASES = {
 
 # settings.py
 
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Allow frontend access
+]
 
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies, tokens, etc.
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",  # Allow CSRF protection for frontend
+]
 
 
 # Password validation
@@ -150,3 +162,8 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+import os
+
+MEDIA_URL = '/media/'  # URL prefix for media files
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')  # Directory where media files are stored

@@ -2,9 +2,12 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from myapi.views import ProductView, BuyerView,RegisterView,LoginAPIView, UpdateBuyerProfileAPIView, DepositToMainBalance, TransferToCashupDeposit, TransferToCashupOwingDeposit, PurchaseProduct,ConfirmedProductsList,CashupOwingDepositByBuyerAPIView,CashupDepositByBuyerAPIView,ConfirmedBuyersForProducts,BuyerPurchasesAPIView , ConfirmedBuyerView,ProductDetail, CartedProductsList
+from myapi.views import ProductView, ItemView, ProfileView , BuyerView,RegisterView,LoginAPIView,SendOTPToBuyer,VerifyBuyerOTP,BuyerDetail,BuyerTransactionCreateView, UpdateBuyerProfileAPIView, DepositToMainBalance, TransferToCashupDeposit, TransferToCashupOwingDeposit, PurchaseProduct,ConfirmedProductsList,CashupOwingDepositByBuyerAPIView,CashupDepositByBuyerAPIView,ConfirmedBuyersForProducts,BuyerPurchasesAPIView , ConfirmedBuyerView,ProductDetail, CartedProductsList
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView 
 from django.contrib.auth.models import User
+
+admin.site.site_header= 'CashUp'
+admin.site.index_title='Welcome to Cashup'
 
 
 
@@ -12,6 +15,8 @@ from django.contrib.auth.models import User
 router = DefaultRouter()
 router.register(r'purchase', ProductView)
 router.register(r'buyers', BuyerView)
+router.register(r'items', ItemView)
+
 
 # Define the urlpatterns with the additional views included
 urlpatterns = [
@@ -26,14 +31,20 @@ urlpatterns = [
      path('api/confirmed-buyersforproduct/', ConfirmedBuyersForProducts.as_view(), name='confirmed-buyersforproduct'),
      path('api/buyer-purchases/<int:buyer_id>/', BuyerPurchasesAPIView.as_view(), name='buyer-purchases'),
      path('api/cashup-deposit/<int:buyer_id>/', CashupDepositByBuyerAPIView.as_view(), name='cashup-deposit'),
-     path('register/', RegisterView.as_view(), name='register'),
-     path('login/', LoginAPIView.as_view(), name='login'),
+     path('api/register/', RegisterView.as_view(), name='register'),
+     path('api/login/', LoginAPIView.as_view(), name='login'),
     path('update-profile/', UpdateBuyerProfileAPIView.as_view(), name='update-profile'),
-    path('deposit/<int:buyer_id>/', DepositToMainBalance.as_view(), name='deposit-to-main-balance'),
-    path('transfer-to-cashup-deposit/<int:buyer_id>/', TransferToCashupDeposit.as_view(), name='transfer-to-cashup-deposit'),
-    path('transfer-to-cashup-owing-deposit/<int:buyer_id>/', TransferToCashupOwingDeposit.as_view(), name='transfer-to-cashup-owing-deposit'),
+    path('api/deposit/', DepositToMainBalance.as_view(), name='deposit-to-main-balance'),
+    path('api/transfer-to-cashup-deposit/', TransferToCashupDeposit.as_view(), name='transfer-to-cashup-deposit'),
+    path('api/transfer-to-cashup-owing-deposit/', TransferToCashupOwingDeposit.as_view(), name='transfer-to-cashup-owing-deposit'),
     path('purchase/', PurchaseProduct.as_view(), name='purchase-product'),
-    path('cashup-owing-deposits/<int:buyer_id>/', CashupOwingDepositByBuyerAPIView.as_view(), name='cashup-owing-deposits-by-buyer'),
+    path('api/cashup-owing-deposit/<int:buyer_id>/', CashupOwingDepositByBuyerAPIView.as_view(), name='cashup-owing-deposits-by-buyer'),
+    path('api/buyer/<int:pk>/', BuyerDetail.as_view(), name='buyer-detail'),
+    path('buyer_transactions/', BuyerTransactionCreateView.as_view(), name='buyer_transaction_create'),
+    path('send-otp/', SendOTPToBuyer.as_view(), name='send-otp'),
+    path('verify-otp/', VerifyBuyerOTP.as_view(), name='verify-otp'),
+    path('api/me/', ProfileView.as_view(), name='profile'),
+
      
     
 ]
