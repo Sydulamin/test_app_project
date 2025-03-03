@@ -1,3 +1,4 @@
+
 """
 Django settings for myproject project.
 
@@ -26,10 +27,7 @@ SECRET_KEY = 'django-insecure-9kf(0t4dz7buu)8(a&7+5gxfyc=v8+1()f_&57^q=1s#u+6n0$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [
-    '*',
-"http://localhost",
-]
+ALLOWED_HOSTS = ['*']
 
 
 
@@ -46,6 +44,7 @@ SIMPLE_JWT = {
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -54,12 +53,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'myapi',
-    'corsheaders',
     'drf_spectacular',
     'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -67,7 +66,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
@@ -105,7 +103,15 @@ DATABASES = {
 
 # settings.py
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Allow frontend access
+]
+
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies, tokens, etc.
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",  # Allow CSRF protection for frontend
+]
 
 
 # Password validation
@@ -126,13 +132,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
 REST_FRAMEWORK = {
-    
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    )
-    
+    ),
 }
 
 
