@@ -166,7 +166,7 @@ def validate_password(value):
 class BuyerTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = BuyerTransaction
-        fields = ['buyer', 'transaction_id', 'phone_number']
+        fields = ['method','amount','buyer', 'transaction_id', 'phone_number']
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -310,7 +310,7 @@ class LoginSerializer(serializers.Serializer):
 class UpdateBuyerProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Buyer
-        fields = ['name', 'phone_number', 'membership_status','date_of_birth','item_image']
+        fields = ['name', 'phone_number', 'membership_status','date_of_birth','address','buyer_image']
         extra_kwargs = {
             'phone_number': {'required': False},  # Make phone_number optional for updates
             'membership_status': {'required': False}  # Make membership_status optional
@@ -320,6 +320,14 @@ class UpdateBuyerProfileSerializer(serializers.ModelSerializer):
         if value and Buyer.objects.filter(phone_number=value).exclude(id=self.instance.id).exists():
             raise serializers.ValidationError("This phone number is already in use.")
         return value
+# serializers.py
+from rest_framework import serializers
+from .models import BuyerOTP
+
+class BuyerOTPSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BuyerOTP
+        fields = ['buyer', 'otp', 'created_at', 'is_verified']
 
 # Deposit Serializer
 class DepositSerializer(serializers.Serializer):

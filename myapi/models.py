@@ -3,6 +3,9 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal
+from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 
 
 
@@ -42,27 +45,61 @@ class Item(models.Model):
 
     def __str__(self):
         return self.name
+from decimal import Decimal
+from django.db import models
+from django.db.models import Sum
 
 
 class Buyer(models.Model):
-    # Existing fields
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='buyer')
     name = models.CharField(max_length=255)
     phone_number = models.CharField(max_length=20, unique=True)
     membership_status = models.BooleanField(default=False)
     main_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
-    date_of_birth = models.DateField(null=True, blank=True)  # Allows null values and blank input
+    date_of_birth = models.DateField(null=True, blank=True)
+    
     GENDER_CHOICES = [
         ('M', 'Male'),
         ('F', 'Female'),
         ('O', 'Other'),
     ]
-    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, null=True, blank=True)  # Allows null values and blank input
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, null=True, blank=True)
     address = models.CharField(max_length=255, blank=True, null=True)
     buyer_image = models.ImageField(upload_to='item_images/', blank=True, null=True, help_text="Image of the buyer")
-    
+
+    def save(self, *args, **kwargs):
+        # Save the instance to ensure it has a valid primary key
+        if not self.pk:
+            super(Buyer, self).save(*args, **kwargs)
+        
+        # Calculate the total cashup_owing_main_balance for this buyer
+        total_owing = CashupOwingDeposit.objects.filter(buyer=self).aggregate(
+            total_owing=Sum('cashup_owing_main_balance')
+        )['total_owing']
+
+        # If no owing balance exists, set it to 0
+        if total_owing is None:
+            total_owing = Decimal('0.0')
+        self.main_balance = Decimal(self.main_balance) - total_owing
+        super(Buyer, self).save(*args, **kwargs)
+
     def __str__(self):
         return self.name
+
+
+
+class BuyerOTP(models.Model):
+    buyer = models.ForeignKey(Buyer, on_delete=models.CASCADE, related_name='otps')
+    otp = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_verified = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.buyer.phone_number} - {self.otp}"
+
+    def is_expired(self):
+        """Check if the OTP has expired (e.g., after 5 minutes)."""
+        return timezone.now() > self.created_at + timedelta(minutes=5)
 
 class Purchase(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE, null=True)
@@ -170,6 +207,12 @@ class BuyerTransaction(models.Model):
     buyer = models.ForeignKey(Buyer, on_delete=models.CASCADE)
     transaction_id = models.CharField(max_length=255, unique=True)
     phone_number = models.CharField(max_length=15)
+    amount=models.CharField(max_length=15,default=0)
+    METHOD_CHOICES = [
+        ('Bkash', 'BKash'),
+        ('Nagad', 'Nagad'),
+    ]
+    method = models.CharField(max_length=10, choices=METHOD_CHOICES, default='Bkash')
     verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

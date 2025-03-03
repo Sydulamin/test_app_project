@@ -24,6 +24,7 @@ class ProductView(viewsets.ModelViewSet):
     serializer_class = PurchaseSerializer
 
 class BuyerView(viewsets.ModelViewSet):
+    permission_classes=[IsAuthenticated]
     """
     This viewset automatically provides `list`, `retrieve`, `create`, `update`, and `destroy` actions.
     """
@@ -42,6 +43,7 @@ class ConfirmedProductsList(generics.ListAPIView):
     serializer_class = PurchaseSerializer
 
 class CartedProductsList(generics.ListAPIView):
+    permission_classes=[IsAuthenticated]
     queryset = Purchase.objects.filter(confirmed=False)
     serializer_class = PurchaseSerializer
 
@@ -64,18 +66,22 @@ class BuyerDetail(generics.RetrieveUpdateDestroyAPIView,mixins.RetrieveModelMixi
                     mixins.UpdateModelMixin,
                     mixins.DestroyModelMixin,
                     generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
     queryset = Buyer.objects.all()
     serializer_class = BuyerSerializer
     
-    def get(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
-    def put(self, request, *args, **kwargs):
-        return self.update(request, *args, **kwargs)
-    def delete(self, request, *args, **kwargs):
-        return self.destroy(request, *args, **kwargs)
+    def get_object(self):
+        # Get the authenticated user from the JWT token
+        user = self.request.user
+        
+        # Retrieve the Buyer instance associated with the authenticated user
+        buyer = get_object_or_404(Buyer, user=user)
+        
+        return buyer
     
 
 class ConfirmedBuyerView(generics.ListAPIView):
+    permission_classes=[IsAuthenticated]
     """
     This viewset provides `list`, `retrieve`, `create`, `update`, and `destroy` actions for confirmed buyers.
     """
@@ -85,6 +91,7 @@ class ConfirmedBuyerView(generics.ListAPIView):
 
 
 class ConfirmedBuyersForProducts(APIView):
+    permission_classes=[IsAuthenticated]
     """
     This view provides a list of all products with their confirmed buyers.
     """
@@ -173,21 +180,32 @@ class BuyerTransactionCreateView(APIView):
 
     
 
-
 class CashupOwingDepositByBuyerAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can access this view
     serializer_class = CashupOwingDepositSerializer
 
     def get_queryset(self):
-        buyer_id = self.kwargs['buyer_id']
-        return CashupOwingDeposit.objects.filter(buyer__id=buyer_id).prefetch_related(Prefetch('buyer', queryset=Buyer.objects.all()))
+        # Get the authenticated user from the JWT token
+        user = self.request.user
         
+        # Retrieve the Buyer instance associated with the authenticated user
+        buyer = get_object_or_404(Buyer, user=user)
+        
+        # Filter CashupOwingDeposit instances for the authenticated buyer
+        # Use select_related to fetch the related Buyer information in a single query
+        return CashupOwingDeposit.objects.filter(buyer=buyer).select_related('buyer')
+    
+
 class CashupDepositByBuyerAPIView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can access this view
     serializer_class = CashupDepositSerializer
 
     def get_queryset(self):
-        buyer_id = self.kwargs['buyer_id']
-        return CashupDeposit.objects.filter(buyer__id=buyer_id).prefetch_related(Prefetch('buyer', queryset=Buyer.objects.all()))
-
+        # Get the authenticated user from the JWT token
+        user = self.request.user
+        
+        # Retrieve the Buyer instance associated with the authenticated user
+        buyer = get_object_or_404(Buyer, user=user)
 
 
 
@@ -298,58 +316,45 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Buyer, CashupOwingDeposit
 from .serializers import DepositSerializer
+from decimal import Decimal
 
 class DepositToMainBalance(APIView):
-    def post(self, request, buyer_id):
-        buyer = get_object_or_404(Buyer, id=buyer_id)
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # Get the buyer associated with the authenticated user
+        buyer = get_object_or_404(Buyer, id=request.user.id)
+        
+        # Validate the incoming data using the DepositSerializer
         serializer = DepositSerializer(data=request.data)
 
         if serializer.is_valid():
-            amount = serializer.validated_data['amount']
-            
-            # Calculate the total cashup_owing_main_balance for the buyer
-            total_cashup_owing_main_balance = CashupOwingDeposit.objects.filter(
-                buyer=buyer
-            ).aggregate(total_balance=Sum('cashup_owing_main_balance'))['total_balance']
+            # Convert the amount to Decimal
+            amount = Decimal(serializer.validated_data['amount'])
 
-            # Handle case where no owing balance exists
-            if total_cashup_owing_main_balance is None:
-                total_cashup_owing_main_balance = 0
+            # Update the buyer's main balance
+            buyer.main_balance += amount
+            buyer.save()
 
-            # Calculate the neat amount
-            neat_amount = amount - total_cashup_owing_main_balance
+            # Print the updated main balance for debugging
+            print(f"New main balance: {buyer.main_balance}")
 
-            # Debugging prints to verify values
-            print(f"Original main balance: {buyer.main_balance}")
-            print(f"Deposit amount: {amount}")
-            print(f"Total cashup owing main balance: {total_cashup_owing_main_balance}")
-            print(f"Neat amount (amount - total owing): {neat_amount}")
-
-            with transaction.atomic():
-                # Update the buyer's main balance
-                buyer.main_balance += neat_amount
-                buyer.save()
-
-                # Set cashup_owing_main_balance to 0 for all relevant CashupOwingDeposit instances
-                CashupOwingDeposit.objects.filter(buyer=buyer).update(cashup_owing_main_balance=0)
-
-                # Print updated main balance for verification
-                print(f"New main balance: {buyer.main_balance}")
-
+            # Return a success response
             return Response(
                 {
-                    "message": f"Deposited {neat_amount} to main balance. Owing balance deducted.",
-                    "new_balance": buyer.main_balance,
-                    "cashup_owing_main_balance": total_cashup_owing_main_balance
+                    "message": f"Deposited {amount} to main balance.",
+                    "new_balance": float(buyer.main_balance),  # Convert Decimal to float for JSON serialization
                 },
                 status=status.HTTP_200_OK
             )
+        
+        # Return an error response if the serializer is not valid
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+    
 class TransferToCashupDeposit(APIView):
-    def post(self, request, buyer_id):
-        buyer = get_object_or_404(Buyer, id=buyer_id)
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        buyer = get_object_or_404(Buyer, id=request.user.id)
         serializer = TransferSerializer(data=request.data)
 
         if serializer.is_valid():
@@ -377,8 +382,9 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
 class TransferToCashupOwingDeposit(APIView):
-    def post(self, request, buyer_id):
-        buyer = get_object_or_404(Buyer, id=buyer_id)
+    permission_classes = [IsAuthenticated]
+    def post(self, request):
+        buyer = get_object_or_404(Buyer, id=request.user.id)
         serializer = TransferSerializer(data=request.data)
 
         if serializer.is_valid():
@@ -409,6 +415,7 @@ class TransferToCashupOwingDeposit(APIView):
 
 
 
+
 from .serializers import PurchaseSerializer
 
 class PurchaseProduct(APIView):
@@ -419,3 +426,92 @@ class PurchaseProduct(APIView):
             serializer.save()
             return Response({"message": "Purchase successful", "purchase": serializer.data}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# views.py
+import random
+import requests
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Buyer, BuyerOTP
+from .serializers import BuyerOTPSerializer
+
+class SendOTPToBuyer(APIView):
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        if not phone_number:
+            return Response({'error': 'Phone number is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            buyer = Buyer.objects.get(phone_number=phone_number)
+        except Buyer.DoesNotExist:
+            return Response({'error': 'Buyer not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        otp = str(random.randint(100000, 999999))
+        # Save OTP to database
+        otp_instance = BuyerOTP.objects.create(buyer=buyer, otp=otp)
+
+        # Send OTP via BulkSMS BD
+        api_key = 'sZPisZCH9HlXyM4JpXeX'
+        sender_id = 'Cashup'
+        message = f'Your OTP is {otp}'
+        url = f'http://bulksmsbd.net/api/smsapi?api_key={api_key}&type=text&number={phone_number}&senderid={sender_id}&message={message}'
+
+        response = requests.get(url)
+        if response.status_code == 200:
+            return Response({'message': 'OTP sent successfully'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Failed to send OTP'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class VerifyBuyerOTP(APIView):
+    def post(self, request):
+        phone_number = request.data.get('phone_number')
+        otp = request.data.get('otp')
+        if not phone_number or not otp:
+            return Response({'error': 'Phone number and OTP are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            buyer = Buyer.objects.get(phone_number=phone_number)
+            otp_instance = BuyerOTP.objects.filter(buyer=buyer, otp=otp, is_verified=False).latest('created_at')
+        except Buyer.DoesNotExist:
+            return Response({'error': 'Buyer not found'}, status=status.HTTP_404_NOT_FOUND)
+        except BuyerOTP.DoesNotExist:
+            return Response({'error': 'Invalid OTP'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if otp_instance.is_expired():
+            return Response({'error': 'OTP expired'}, status=status.HTTP_400_BAD_REQUEST)
+
+        otp_instance.is_verified = True
+        otp_instance.save()
+
+        return Response({'message': 'OTP verified successfully'}, status=status.HTTP_200_OK)
+
+from rest_framework.permissions import IsAuthenticated
+
+
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        # Fetch the buyer profile associated with the authenticated user
+        try:
+            buyer = Buyer.objects.get(user=request.user)
+        except Buyer.DoesNotExist:
+            return Response(
+                {"detail": "Buyer profile not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Fetch purchases associated with the buyer
+        purchases = Purchase.objects.filter(buyer=buyer)
+
+        # Serialize the buyer profile and purchases
+        buyer_serializer = BuyerSerializer(buyer)
+        
+
+        # Combine the serialized data
+        response_data = {
+            "buyer": buyer_serializer.data,
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
