@@ -130,11 +130,7 @@ class BuyerPurchasesAPIView(APIView):
     """
     def get(self, request, *args, **kwargs):
         buyer_id = kwargs.get('buyer_id')
-<<<<<<< HEAD
-        buyer = Buyer.objects.get(id=buyer_id)
-=======
         buyer = get_object_or_404(Buyer, id=request.user.id)
->>>>>>> siaamh-main
         products = Purchase.objects.filter(buyer=buyer, confirmed=True,paid=True)
         
         total_cost = 0
@@ -175,17 +171,6 @@ logger = logging.getLogger(__name__)
 
 
 
-<<<<<<< HEAD
-class BuyerTransactionCreateView(APIView):
-    def post(self, request, *args, **kwargs):
-        serializer = BuyerTransactionSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-=======
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -224,7 +209,6 @@ class BuyerTransactionCreateView(APIView):
 
 
 
->>>>>>> siaamh-main
     
 
 class CashupOwingDepositByBuyerAPIView(generics.ListAPIView):

@@ -36,12 +36,8 @@ class PurchaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Purchase
         fields = [
-<<<<<<< HEAD
-            'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 'confirmed','discount_total_price'
-=======
             'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 
             'confirmed', 'discount_total_price', 'item_image'  # Add 'item_image' here
->>>>>>> siaamh-main
         ]
     def create(self, validated_data):
         # Extract the buyer and total price from the validated data
@@ -189,16 +185,11 @@ def validate_password(value):
 class BuyerTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = BuyerTransaction
-<<<<<<< HEAD
-        fields = ['method','amount','buyer', 'transaction_id', 'phone_number']
-
-=======
         fields = '__all__'
     
     def create(self, validated_data):
         # Create method doesn't need to manually handle 'buyer' because it's already set in the view
         return super().create(validated_data)
->>>>>>> siaamh-main
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
