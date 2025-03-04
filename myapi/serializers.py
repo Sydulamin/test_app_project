@@ -29,15 +29,16 @@ from rest_framework import serializers
 from .models import Purchase, Buyer, Item
 
 class PurchaseSerializer(serializers.ModelSerializer):
+    item_image = serializers.ImageField(source='item.item_image', read_only=True)  # Getting the image from related Item
     buyer = serializers.PrimaryKeyRelatedField(queryset=Buyer.objects.all())  # Allow buyer to be set via ID
     item = serializers.PrimaryKeyRelatedField(queryset=Item.objects.all())  # Allow item to be set via ID
 
     class Meta:
         model = Purchase
         fields = [
-            'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 'confirmed','discount_total_price'
+            'id', 'item', 'total_price', 'discount_rate', 'quantity', 'buyer', 
+            'confirmed', 'discount_total_price', 'item_image'  # Add 'item_image' here
         ]
-
     def create(self, validated_data):
         # Extract the buyer and total price from the validated data
         buyer = validated_data['buyer']
@@ -101,7 +102,8 @@ class PurchaseSerializer(serializers.ModelSerializer):
             discount_rate=validated_data.get('discount_rate', 0),
             quantity=quantity,
             buyer=buyer,
-            confirmed=True,
+            
+
         )
 
         return purchase
@@ -166,8 +168,11 @@ def validate_password(value):
 class BuyerTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = BuyerTransaction
-        fields = ['method','amount','buyer', 'transaction_id', 'phone_number']
-
+        fields = '__all__'
+    
+    def create(self, validated_data):
+        # Create method doesn't need to manually handle 'buyer' because it's already set in the view
+        return super().create(validated_data)
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
