@@ -123,19 +123,25 @@ class ConfirmedBuyersForProducts(APIView):
         return Response(data)
 
 class BuyerPurchasesAPIView(APIView):
+    permission_classes=[IsAuthenticated]
+
     """
     This view provides the purchased products for a specific buyer and calculates the discount prices and total cost.
     """
     def get(self, request, *args, **kwargs):
         buyer_id = kwargs.get('buyer_id')
+<<<<<<< HEAD
         buyer = Buyer.objects.get(id=buyer_id)
+=======
+        buyer = get_object_or_404(Buyer, id=request.user.id)
+>>>>>>> siaamh-main
         products = Purchase.objects.filter(buyer=buyer, confirmed=True,paid=True)
         
         total_cost = 0
         product_list = []
         
         for product in products:
-            original_price = product.original_price
+            original_price = product.total_price
             discount_rate = product.discount_rate
             quantity = product.quantity
             
@@ -169,6 +175,7 @@ logger = logging.getLogger(__name__)
 
 
 
+<<<<<<< HEAD
 class BuyerTransactionCreateView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = BuyerTransactionSerializer(data=request.data)
@@ -178,6 +185,46 @@ class BuyerTransactionCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+=======
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import BuyerTransactionSerializer
+from .models import Buyer
+
+class BuyerTransactionCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        # Get the authenticated user
+        user = request.user  # The logged-in user (assuming the buyer is the authenticated user)
+
+        # Get the corresponding Buyer instance for the logged-in user
+        try:
+            buyer = Buyer.objects.get(user=user)  # Assuming there's a ForeignKey in Buyer model to User
+        except Buyer.DoesNotExist:
+            return Response({"detail": "Buyer instance not found for this user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Make a mutable copy of the request data
+        data = request.data.copy()
+
+        # Set the 'buyer' field to the found Buyer instance
+        data['buyer'] = buyer.id  # This assumes the 'buyer' field is a foreign key in BuyerTransaction model
+
+        # Now, proceed with the serialization and saving of the transaction
+        serializer = BuyerTransactionSerializer(data=data)
+        
+        if serializer.is_valid():
+            # Save the transaction instance, buyer will automatically be set
+            serializer.save(buyer=buyer)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+>>>>>>> siaamh-main
     
 
 class CashupOwingDepositByBuyerAPIView(generics.ListAPIView):

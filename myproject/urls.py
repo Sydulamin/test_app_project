@@ -29,8 +29,13 @@ urlpatterns = [
     path('api/product/<int:pk>/', ProductDetail.as_view(), name='product-detail'),
      path('api/confirmed-buyers/', ConfirmedBuyerView.as_view(), name='confirmed-buyer'),
      path('api/confirmed-buyersforproduct/', ConfirmedBuyersForProducts.as_view(), name='confirmed-buyersforproduct'),
+<<<<<<< HEAD
      path('api/buyer-purchases/<int:buyer_id>/', BuyerPurchasesAPIView.as_view(), name='buyer-purchases'),
      path('api/cashup-deposit/<int:buyer_id>/', CashupDepositByBuyerAPIView.as_view(), name='cashup-deposit'),
+=======
+     path('api/buyer-purchases/', BuyerPurchasesAPIView.as_view(), name='buyer-purchases'),
+     path('api/cashup-deposit/', CashupDepositByBuyerAPIView.as_view(), name='cashup-deposit'),
+>>>>>>> siaamh-main
      path('api/register/', RegisterView.as_view(), name='register'),
      path('api/login/', LoginAPIView.as_view(), name='login'),
     path('update-profile/', UpdateBuyerProfileAPIView.as_view(), name='update-profile'),
@@ -38,8 +43,13 @@ urlpatterns = [
     path('api/transfer-to-cashup-deposit/', TransferToCashupDeposit.as_view(), name='transfer-to-cashup-deposit'),
     path('api/transfer-to-cashup-owing-deposit/', TransferToCashupOwingDeposit.as_view(), name='transfer-to-cashup-owing-deposit'),
     path('purchase/', PurchaseProduct.as_view(), name='purchase-product'),
+<<<<<<< HEAD
     path('api/cashup-owing-deposit/<int:buyer_id>/', CashupOwingDepositByBuyerAPIView.as_view(), name='cashup-owing-deposits-by-buyer'),
     path('api/buyer/<int:pk>/', BuyerDetail.as_view(), name='buyer-detail'),
+=======
+    path('api/cashup-owing-deposit/', CashupOwingDepositByBuyerAPIView.as_view(), name='cashup-owing-deposits-by-buyer'),
+    path('api/buyer/', BuyerDetail.as_view(), name='buyer-detail'),
+>>>>>>> siaamh-main
     path('buyer_transactions/', BuyerTransactionCreateView.as_view(), name='buyer_transaction_create'),
     path('send-otp/', SendOTPToBuyer.as_view(), name='send-otp'),
     path('verify-otp/', VerifyBuyerOTP.as_view(), name='verify-otp'),
