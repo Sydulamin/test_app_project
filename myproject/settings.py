@@ -103,14 +103,16 @@ DATABASES = {
 
 # settings.py
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Allow frontend access
-]
+
 
 CORS_ALLOW_CREDENTIALS = True  # Allow cookies, tokens, etc.
-
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://cashup-beta.vercel.app"   # Allow frontend access
+]
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",  # Allow CSRF protection for frontend
+    "http://localhost:3000",
+    "https://cashup-beta.vercel.app"   # Allow CSRF protection for frontend
 ]
 
 
